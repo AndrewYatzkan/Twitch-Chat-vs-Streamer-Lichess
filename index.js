@@ -105,10 +105,10 @@ function streamIncomingEvents() {
                 let data = chunk.toString();
                 try {
                 	let json = JSON.parse(data);
-
                 	if (json.type === 'challenge' && json.challenge.challenger.id === OPTS.STREAMER_LICHESS.toLowerCase()) {
-                		beginGame(json.challenge.id);
-                	}
+                		acceptChallenge(json.challenge.id);
+                	} else if (json.type === 'gameStart')
+                		beginGame(json.game.id);
                 } catch (e) { return; }
             });
             res.on('end', () => {
@@ -199,34 +199,32 @@ async function initiateVote(gameId, moves, revote=0) {
 
 async function beginGame(gameId) {
 	try {
-		if (await acceptGame(gameId)) {
-			say('Game started!', gameId);
-			ongoingGames[gameId] = { white: null };
-			var result = await streamGameState(gameId);
-			delete ongoingGames[gameId];
-			switch (result) {
-				case 'draw':
-					say('Game over - It\'s a draw!', gameId);
-					break;
-				case 'chat':
-					say('Chat wins! PogChamp', gameId);
-					break;
-				case 'streamer':
-					say(`${OPTS.STREAMER} wins! Better luck next time chat.`, gameId);
-					break;
-				default: // should only happen if game state stops streaming for unknown reason
-					say('Game over.', gameId);
-			}
+		say('Game started!', gameId);
+		ongoingGames[gameId] = { white: null };
+		var result = await streamGameState(gameId);
+		delete ongoingGames[gameId];
+		switch (result) {
+			case 'draw':
+				say('Game over - It\'s a draw!', gameId);
+				break;
+			case 'chat':
+				say('Chat wins! PogChamp', gameId);
+				break;
+			case 'streamer':
+				say(`${OPTS.STREAMER} wins! Better luck next time chat.`, gameId);
+				break;
+			default: // should only happen if game state stops streaming for unknown reason
+				say('Game over.', gameId);
 		}
 	} catch (e) {
 		console.log(e);
 	}
 }
 
-async function acceptGame(gameId) {
+async function acceptChallenge(challengeId) {
 	const options = {
         hostname: 'lichess.org',
-        path: `/api/challenge/${gameId}/accept`,
+        path: `/api/challenge/${challengeId}/accept`,
         headers: { Authorization: `Bearer ${OPTS.LICHESS_OAUTH}` },
         method: 'POST'
     };
