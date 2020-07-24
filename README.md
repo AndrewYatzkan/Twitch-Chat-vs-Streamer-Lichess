@@ -5,12 +5,13 @@
 1) Create a file named config.js with the following code:
 ```
 module.exports = {
-	STREAMER: 'streamer's twitch username',
-	STREAMER_LICHESS: 'streamer's lichess username',
-	TWITCH_OAUTH: 'oauth token for bot's twitch account,
-	LICHESS_OAUTH: 'oauth token for bot's lichess account,
-	CHAT_COOLDOWN: time in milliseconds to wait between sending messages (1-2 seconds is good) not needed if bot is vip or mod,
-	VOTING_PERIOD: time in seconds that chat has to vote
+	STREAMER: (String) streamer's twitch username,
+	STREAMER_LICHESS: (String) streamer's lichess username,
+	TWITCH_OAUTH: (String) oauth token for bot's twitch account,
+	LICHESS_OAUTH: (String) oauth token for bot's lichess account,
+	CHAT_COOLDOWN: (int) time in milliseconds to wait between sending messages (1-2 seconds is good) not needed if bot is vip or mod,
+	VOTING_PERIOD: (int) time in seconds that chat has to vote,
+	ACKNOWLEDGE_VOTE: (Boolean) whether or not the twitch bot should acknowledge users' votes in chat
 };
 ```
 

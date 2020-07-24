@@ -1,28 +1,9 @@
-/*
-To-do:
- - vote to offer draw
- - vote to resign
- - web page to put on stream that visualizes the voting process
-*/
-
 // vvvv for debugging
 process.on('unhandledRejection', (reason, p) => {
   console.log('Unhandled Rejection at: Promise', p, 'reason:', reason);
 });
 
 var OPTS = require('./config.js');
-
-/*
-OPTS:
-{
-	STREAMER: 'streamer's twitch username',
-	STREAMER_LICHESS: 'streamer's lichess username',
-	TWITCH_OAUTH: 'oauth token for bot's twitch account,
-	LICHESS_OAUTH: 'oauth token for bot's lichess account,
-	CHAT_COOLDOWN: time in milliseconds to wait between sending messages (1-2 seconds is good) not needed if bot is vip or mod,
-	VOTING_PERIOD: time in seconds that chat has to vote
-};
-*/
 
 var messageQueue = [];
 
@@ -81,7 +62,7 @@ client.on('message', (channel, tags, message, self) => {
 
 			voters.push(tags.username)
 
-			client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
+			if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
 
 			// console.log(candidates);
 		}
