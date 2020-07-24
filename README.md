@@ -15,6 +15,8 @@ module.exports = {
 };
 ```
 
+(You can get the twitch oauth token [here](https://twitchapps.com/tmi/), and the lichess oauth token [here](https://lichess.org/api#operation/botAccountUpgrade))
+
 2) The streamer needs to challenge the lichess bot-it should automatically accept it and the game will begin with instructions sent to chat!
 
 ## To-do:
