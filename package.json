@@ -1,0 +1,15 @@
+{
+  "name": "ttvchatmoves",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrew Yatzkan",
+  "license": "ISC",
+  "dependencies": {
+    "chess.js": "^0.11.0",
+    "tmi.js": "^1.5.0"
+  }
+}
