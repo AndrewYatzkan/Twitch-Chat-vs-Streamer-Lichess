@@ -14,6 +14,27 @@ var candidates = {};
 var voters = [];
 var ongoingGames = {};
 
+// Socket.io part ---------------------------------------------
+
+var app = require('express')();
+var http = require('http').createServer(app);
+var io = require('socket.io')(http);
+var port = 3000;
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/votes.html');
+});
+
+io.on('connection', (socket) => {
+	socket.emit('candidates', candidates);
+});
+
+http.listen(port, () => {
+  console.log(`Express server listening on *:${port}`);
+});
+
+// ------------------------------------------------------------
+
 const https = require('https');
 const tmi = require('tmi.js');
 
@@ -33,6 +54,7 @@ const client = new tmi.Client({
 client.connect();
 
 client.on('join', () => {
+	console.log(`Twitch client has joined the chat!`);
 	let userstate = client.userstate[`#${OPTS.STREAMER.toLowerCase()}`];
 	OPTS.COOLDOWN_APPLIES = !(userstate.mod || (userstate.badges && userstate.badges.vip));
 
@@ -61,6 +83,8 @@ client.on('message', (channel, tags, message, self) => {
 				candidates[UCI] = 1;
 
 			voters.push(tags.username)
+
+			io.emit('candidates', candidates);
 
 			if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
 
@@ -167,6 +191,7 @@ async function initiateVote(gameId, moves, revote=0) {
 		sloppyPGN = false;
 		voters = [];
 		candidates = {};
+		io.emit('candidates', candidates);
 
 		await makeMove(gameId, winningMove);
 		say(`Playing move: ${winningMove}`);

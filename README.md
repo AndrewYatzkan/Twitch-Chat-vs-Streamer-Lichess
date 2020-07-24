@@ -18,6 +18,7 @@ module.exports = {
 2) The streamer needs to challenge the lichess bot-it should automatically accept it and the game will begin with instructions sent to chat!
 
 ## To-do:
- - vote to offer draw
- - vote to resign
- - web page to put on stream that visualizes the voting process
+ - [ ] vote to offer draw
+ - [ ] vote to resign
+ - [x] web page to put on stream that visualizes the voting process
+ - [ ] multiple streamers at once! shouldn't be too hard with current setup
