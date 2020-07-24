@@ -54,7 +54,6 @@ const client = new tmi.Client({
 client.connect();
 
 client.on('join', () => {
-	console.log(`Twitch client has joined the chat!`);
 	let userstate = client.userstate[`#${OPTS.STREAMER.toLowerCase()}`];
 	OPTS.COOLDOWN_APPLIES = !(userstate.mod || (userstate.badges && userstate.badges.vip));
 
@@ -178,7 +177,7 @@ function say(msg) {
 async function initiateVote(gameId, moves, revote=0) {
 	if (!Object.keys(ongoingGames).includes(gameId)) return;
 	// say(revote ? `Nobody voted for a valid move! You have ${OPTS.VOTING_PERIOD} seconds to vote again. (${revote})` : `Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: e2e4).`);
-	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: 'e2e4').`);
+	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move.`);
 	sloppyPGN = moves;
 	setTimeout(async () => {
 		var arr = Object.keys(candidates).map(key => [key, candidates[key]]);
