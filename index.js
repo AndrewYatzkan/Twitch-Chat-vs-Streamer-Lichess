@@ -70,6 +70,13 @@ client.on('message', (channel, tags, message, self) => {
 
 	// console.log(sloppyPGN !== false , /^[RNBKQqK0-8a-h+#]{1,7}$/.test(message) , !voters.includes(tags.username))
 	// console.log(voters);
+	if (OPTS.AUTHORIZED_USERS.includes(tags.username) && /^!setvotingperiod \d+$/i.test(message)) {
+		let voting_period;
+		if ((voting_period = parseInt(message.split(' ')[1])) && voting_period > 3 && voting_period < 1200) {
+			OPTS.VOTING_PERIOD = voting_period;
+			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
+		}
+	}
 	if (sloppyPGN !== false && /^[RNBKQqK0-8a-h+#x]{1,7}$/.test(message) && !voters.includes(tags.username)) { // regex here is a *very* crude filter to only let messages that might be moves in
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
@@ -177,7 +184,7 @@ function say(msg) {
 async function initiateVote(gameId, moves, revote=0) {
 	if (!Object.keys(ongoingGames).includes(gameId)) return;
 	// say(revote ? `Nobody voted for a valid move! You have ${OPTS.VOTING_PERIOD} seconds to vote again. (${revote})` : `Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: e2e4).`);
-	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move.`);
+	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: 'e2e4').`);
 	sloppyPGN = moves;
 	setTimeout(async () => {
 		var arr = Object.keys(candidates).map(key => [key, candidates[key]]);
