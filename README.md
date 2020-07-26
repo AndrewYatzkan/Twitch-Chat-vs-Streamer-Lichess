@@ -25,7 +25,7 @@ module.exports = {
 
 ## To-do:
  - [ ] vote to offer draw
- - [ ] vote to resign
+ - [x] vote to resign
  - [x] web page to put on stream that visualizes the voting process
  - [ ] multiple streamers at once! shouldn't be too hard with current setup
  	- Update: won't work unless lichess authorizes the host ip to bypass their rate limiting
