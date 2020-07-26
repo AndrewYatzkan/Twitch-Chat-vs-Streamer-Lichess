@@ -21,9 +21,9 @@
 		var sortedCandidates = Object.keys(candidates).map(key => [key, candidates[key]]).sort((a, b) => b[1] - a[1]);
 		document.body.innerHTML = '';
 		for (candidate of sortedCandidates) {
-			var [move, votes] = candidate;
+			var { votes, SAN } = candidate[1];
 			var ul = document.createElement('ul');
-			var text = document.createTextNode(`${move} (${votes} vote${votes === 1 ? '' : 's'})`);
+			var text = document.createTextNode(`${SAN} (${votes} vote${votes === 1 ? '' : 's'})`);
 			ul.appendChild(text);
 			document.body.appendChild(ul);
 		}

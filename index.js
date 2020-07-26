@@ -78,24 +78,25 @@ client.on('message', (channel, tags, message, self) => {
 			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
 		}
 	}
-	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
+	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) /*&& tags.username !== OPTS.STREAMER.toLowerCase()*/) { // regex here is a *very* crude filter to only let messages that might be moves in
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
 		let move;
 		if (move = chess.move(message, { sloppy: true })) {
 			let UCI = move.from + move.to;
+			let SAN = move.san;
 			if (candidates[UCI])
-				candidates[UCI]++;
+				candidates[UCI].votes++;
 			else
-				candidates[UCI] = 1;
+				candidates[UCI] = { votes: 1, SAN };
 
 			voters.push(tags.username)
 
 			io.emit('candidates', candidates);
 
 			// if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
-			if (OPTS.ACKNOWLEDGE_VOTE) say(`@${tags['display-name']} voted for ${UCI}!`);
-			else console.log(`@${tags['display-name']} voted for ${UCI}!`);
+			if (OPTS.ACKNOWLEDGE_VOTE) say(`@${tags['display-name']} voted for ${SAN}!`);
+			else console.log(`@${tags['display-name']} voted for ${SAN}!`);
 
 			// console.log(candidates);
 		}
@@ -153,7 +154,11 @@ async function streamGameState(gameId) {
 	                		if (numMoves % 2 != ongoingGames[gameId].white) {
 	                			// bot's turn to move
 	                			if (numMoves >= 1) {
-	                				say(`Opponent played: ${json.moves.split(' ').pop()}`);
+	                				let sloppyPGN = json.moves.split(' ');
+	                				let streamerMove = sloppyPGN.pop();
+	                				chess.load_pgn(sloppyPGN.join(' '), { sloppy: true });
+									streamerMove = chess.move(streamerMove, { sloppy: true });
+	                				say(`Streamer played: ${streamerMove.san}`);
 	                			}
 
 	                			await initiateVote(gameId, json.moves);
@@ -187,10 +192,10 @@ function say(msg) {
 async function initiateVote(gameId, moves, revote=0) {
 	if (!Object.keys(ongoingGames).includes(gameId)) return;
 	// say(revote ? `Nobody voted for a valid move! You have ${OPTS.VOTING_PERIOD} seconds to vote again. (${revote})` : `Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: e2e4).`);
-	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: 'e2e4').`);
+	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move.`);
 	sloppyPGN = moves;
 	setTimeout(async () => {
-		var arr = Object.keys(candidates).map(key => [key, candidates[key]]);
+		var arr = Object.keys(candidates).map(key => [key, candidates[key].votes, candidates[key].SAN]);
 		if (arr.length == 0) {
 			await initiateVote(gameId, moves, ++revote);
 			return;
