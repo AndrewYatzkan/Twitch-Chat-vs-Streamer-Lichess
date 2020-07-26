@@ -202,6 +202,7 @@ async function initiateVote(gameId, moves, revote=0) {
 		candidates = {};
 		io.emit('candidates', candidates);
 
+		if (!Object.keys(ongoingGames).includes(gameId)) return;
 		await makeMove(gameId, winningMove);
 		say(`Playing move: ${winningMove}`);
 	}, OPTS.VOTING_PERIOD * 1000);
