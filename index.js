@@ -78,13 +78,18 @@ client.on('message', (channel, tags, message, self) => {
 			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
 		}
 	}
-	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
+	if (sloppyPGN !== false && /^([RNBKQK0-8a-h+#x=-]{2,7}|resign)$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
+		if (/^[Oo0]-[Oo0]$/.test(message)) message = 'O-O';
+		if (/^[Oo0]-[Oo0]-[Oo0]$/.test(message)) message = 'O-O-O';
+
+		let resign = message.toLowerCase().trim() === 'resign'; // added resign functionality in a pinch-might want to make code cleaner
+
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
 		let move;
-		if (move = chess.move(message, { sloppy: true })) {
-			let UCI = move.from + move.to;
-			let SAN = move.san;
+		if (resign || (move = chess.move(message, { sloppy: true }))) {
+			let UCI = resign ? 'resign' : move.from + move.to;
+			let SAN = resign ? 'resign' : move.san;
 			if (candidates[UCI])
 				candidates[UCI].votes++;
 			else
@@ -209,7 +214,10 @@ async function initiateVote(gameId, moves, revote=0) {
 		io.emit('candidates', candidates);
 
 		if (!Object.keys(ongoingGames).includes(gameId)) return;
-		await makeMove(gameId, winningMove[0] /* UCI */);
+		if (winningMove[0] === 'resign')
+			await resignGame(gameId);
+		else
+			await makeMove(gameId, winningMove[0] /* UCI */);
 		say(`Playing move: ${winningMove[2] /* SAN */}`);
 	}, OPTS.VOTING_PERIOD * 1000);
 }
