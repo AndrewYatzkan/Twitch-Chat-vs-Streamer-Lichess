@@ -13,6 +13,7 @@ var sloppyPGN = false;
 var candidates = {};
 var voters = [];
 var ongoingGames = {};
+var cooldownInterval;
 
 // Socket.io part ---------------------------------------------
 
@@ -57,8 +58,8 @@ client.on('join', () => {
 	let userstate = client.userstate[`#${OPTS.STREAMER.toLowerCase()}`];
 	OPTS.COOLDOWN_APPLIES = !(userstate.mod || (userstate.badges && userstate.badges.vip));
 
-	if (OPTS.COOLDOWN_APPLIES) {
-		setInterval(() => {
+	if (OPTS.COOLDOWN_APPLIES && !cooldownInterval) {
+		cooldownInterval = setInterval(() => {
 			let msg;
 			if (msg = messageQueue.shift()) client.say(OPTS.STREAMER, msg)
 		}, OPTS.CHAT_COOLDOWN);
@@ -68,7 +69,7 @@ client.on('join', () => {
 client.on('message', (channel, tags, message, self) => {
 	if (self) return;
 
-	// console.log(sloppyPGN !== false , /^[RNBKQqK0-8a-h+#]{1,7}$/.test(message) , !voters.includes(tags.username))
+	// console.log(sloppyPGN !== false , /^[RNBKQK0-8a-h+#x=]{2,7}$/i.test(message) , !voters.includes(tags.username))
 	// console.log(voters);
 	if (OPTS.AUTHORIZED_USERS.includes(tags.username) && /^!setvotingperiod \d+$/i.test(message)) {
 		let voting_period;
@@ -77,7 +78,7 @@ client.on('message', (channel, tags, message, self) => {
 			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
 		}
 	}
-	if (sloppyPGN !== false && /^[RNBKQqK0-8a-h+#x]{1,7}$/.test(message) && !voters.includes(tags.username)) { // regex here is a *very* crude filter to only let messages that might be moves in
+	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
 		let move;
@@ -92,7 +93,9 @@ client.on('message', (channel, tags, message, self) => {
 
 			io.emit('candidates', candidates);
 
-			if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
+			// if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
+			if (OPTS.ACKNOWLEDGE_VOTE) say(`@${tags['display-name']} voted for ${UCI}!`);
+			else console.log(`@${tags['display-name']} voted for ${UCI}!`);
 
 			// console.log(candidates);
 		}
