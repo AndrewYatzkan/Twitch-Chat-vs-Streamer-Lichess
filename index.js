@@ -87,7 +87,7 @@ client.on('message', (channel, tags, message, self) => {
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
 		let move;
-		if (resign || (move = chess.move(message, { sloppy: true }))) {
+		if (resign || (move = chess.move(message, { sloppy: true })) || (move = chess.move(message.charAt(0).toUpperCase() + message.slice(1), { sloppy: true }))) {
 			let UCI = resign ? 'resign' : move.from + move.to;
 			let SAN = resign ? 'resign' : move.san;
 			if (candidates[UCI])
