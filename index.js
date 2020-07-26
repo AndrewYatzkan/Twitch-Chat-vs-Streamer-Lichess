@@ -78,7 +78,7 @@ client.on('message', (channel, tags, message, self) => {
 			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
 		}
 	}
-	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) /*&& tags.username !== OPTS.STREAMER.toLowerCase()*/) { // regex here is a *very* crude filter to only let messages that might be moves in
+	if (sloppyPGN !== false && /^[RNBKQK0-8a-h+#x=-]{2,7}$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
 		chess.load_pgn(sloppyPGN, { sloppy: true });
 		
 		let move;
@@ -154,6 +154,7 @@ async function streamGameState(gameId) {
 	                		if (numMoves % 2 != ongoingGames[gameId].white) {
 	                			// bot's turn to move
 	                			if (numMoves >= 1) {
+	                				// nicer way to write this code? had to add it in a pinch
 	                				let sloppyPGN = json.moves.split(' ');
 	                				let streamerMove = sloppyPGN.pop();
 	                				chess.load_pgn(sloppyPGN.join(' '), { sloppy: true });
@@ -200,7 +201,7 @@ async function initiateVote(gameId, moves, revote=0) {
 			await initiateVote(gameId, moves, ++revote);
 			return;
 		}
-		var winningMove = arr.sort((a, b) => b[1] - a[1])[0][0];
+		var winningMove = arr.sort((a, b) => b[1] - a[1])[0];
 
 		sloppyPGN = false;
 		voters = [];
@@ -208,8 +209,8 @@ async function initiateVote(gameId, moves, revote=0) {
 		io.emit('candidates', candidates);
 
 		if (!Object.keys(ongoingGames).includes(gameId)) return;
-		await makeMove(gameId, winningMove);
-		say(`Playing move: ${winningMove}`);
+		await makeMove(gameId, winningMove[0] /* UCI */);
+		say(`Playing move: ${winningMove[2] /* SAN */}`);
 	}, OPTS.VOTING_PERIOD * 1000);
 }
 

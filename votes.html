@@ -18,7 +18,7 @@
 <script>
 	const socket = io();
 	socket.on('candidates', candidates => {
-		var sortedCandidates = Object.keys(candidates).map(key => [key, candidates[key]]).sort((a, b) => b[1] - a[1]);
+		var sortedCandidates = Object.keys(candidates).map(key => [key, candidates[key]]).sort((a, b) => b[1].votes - a[1].votes);
 		document.body.innerHTML = '';
 		for (candidate of sortedCandidates) {
 			var { votes, SAN } = candidate[1];

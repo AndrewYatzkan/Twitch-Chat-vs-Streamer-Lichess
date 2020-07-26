@@ -20,6 +20,9 @@ module.exports = {
 
 2) The streamer needs to challenge the lichess bot-it should automatically accept it and the game will begin with instructions sent to chat!
 
+## Bugs:
+ - if the bot is restarted on its turn, it doesn't reconnect
+
 ## To-do:
  - [ ] vote to offer draw
  - [ ] vote to resign
