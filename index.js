@@ -7,12 +7,16 @@ var OPTS = require('./config.js');
 
 var messageQueue = [];
 
+const REGEX = {
+	SET_VOTING_PERIOD: /^!setvotingperiod \d+$/i,
+	POTENTIAL_MOVE: /^([RNBKQK0-8a-h+#x=-]{2,7}|resign|offer draw|accept draw)$/i, // very crude guesstimate
+	KINGSIDE_CASTLE: /^[Oo0]-[Oo0]$/,
+	QUEENSIDE_CASTLE: /^[Oo0]-[Oo0]-[Oo0]$/
+};
+
 const { Chess } = require('chess.js');
 const chess = new Chess();
-var sloppyPGN = false;
-var candidates = {};
-var voters = [];
-var ongoingGames = {};
+var games = {};
 var cooldownInterval;
 
 // Socket.io part ---------------------------------------------
@@ -27,7 +31,11 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-	socket.emit('candidates', candidates);
+	socket.on('streamer', (streamer) => {
+		socket.join(streamer.toLowerCase());
+		let game = games[gameIdFromTwitch(streamer)];
+		if (game) socket.emit('candidates', game.candidates);
+	});
 });
 
 http.listen(port, () => {
@@ -36,11 +44,14 @@ http.listen(port, () => {
 
 // ------------------------------------------------------------
 
+// module to send http requests / communicate with the lichess api
 const https = require('https');
+
+// twitch messaging interface module
 const tmi = require('tmi.js');
 
 const client = new tmi.Client({
-	options: { debug: false }, // set to false to get rid of console messages
+	options: { debug: true }, // set to false to get rid of console messages
 	connection: {
 		secure: true,
 		reconnect: true
@@ -52,58 +63,98 @@ const client = new tmi.Client({
 	channels: [ OPTS.STREAMER ]
 });
 
+// connect twitch client
 client.connect();
 
+// twitch client joins the streamer's chat
 client.on('join', () => {
 	let userstate = client.userstate[`#${OPTS.STREAMER.toLowerCase()}`];
-	OPTS.COOLDOWN_APPLIES = !(userstate.mod || (userstate.badges && userstate.badges.vip));
+	OPTS.CHAT_COOLDOWN_APPLIES = !isModOrVIP(userstate);
+	console.log(`Chat cooldown applies:`, OPTS.CHAT_COOLDOWN_APPLIES);
 
-	if (OPTS.COOLDOWN_APPLIES && !cooldownInterval) {
-		cooldownInterval = setInterval(() => {
-			let msg;
-			if (msg = messageQueue.shift()) client.say(OPTS.STREAMER, msg)
-		}, OPTS.CHAT_COOLDOWN);
-	}
+	if (OPTS.CHAT_COOLDOWN_APPLIES && !cooldownInterval)
+		cooldownInterval = setInterval(shiftChatQueue, OPTS.CHAT_COOLDOWN);
 });
+
+function isModOrVIP(userstate) { return userstate.mod || (userstate.badges && userstate.badges.vip); }
+function shiftChatQueue() { let msg; if (msg = messageQueue.shift()) client.say(OPTS.STREAMER, msg); }
+function userIsAuthorized(username) { return OPTS.AUTHORIZED_USERS.includes(username); }
+function isBotsTurn(game) { return !(game.sloppyPGN === null); }
+function alreadyVoted(username, game) { return game.voters.includes(username); }
+function alreadyOfferedDraw(username, game) { return game.offeringDraw.includes(username); }
+function isDrawOffer(message) { return message.toLowerCase().trim === 'offer draw' || message.toLowerCase().trim() === 'accept draw'; }
+function testMove(possibleMove, gameId) {
+	chess.load_pgn(games[gameId].sloppyPGN, { sloppy: true });
+	let result;
+	if (possibleMove.toLowerCase().trim() === 'resign')
+		return { from: 'resign', to: '', san: 'resign'}
+	else if (isDrawOffer(possibleMove))
+		return { from: 'offer/accept draw', to: '', san: 'offer/accept draw' }
+	else if (result = chess.move(possibleMove, { sloppy: true }))
+		return result;
+	else
+		return chess.move(possibleMove.charAt(0).toUpperCase() + possibleMove.slice(1), { sloppy: true });
+}
+function emitCandidates(game) { io.to(game.streamer.twitch).emit('candidates', game.candidates); }
+function validChallenge(json) {
+	return json.type === 'challenge' && json.challenge.challenger.id === OPTS.STREAMER_LICHESS.toLowerCase();
+}
+function gameIdFromTwitch(twitch) {
+	for (gameId of Object.keys(games)) {
+		let game = games[gameId];
+		if (game.streamer.twitch === twitch.toLowerCase()) return gameId;
+	}
+	return false;
+}
 
 client.on('message', (channel, tags, message, self) => {
 	if (self) return;
 
-	// console.log(sloppyPGN !== false , /^[RNBKQK0-8a-h+#x=]{2,7}$/i.test(message) , !voters.includes(tags.username))
-	// console.log(voters);
-	if (OPTS.AUTHORIZED_USERS.includes(tags.username) && /^!setvotingperiod \d+$/i.test(message)) {
+	if (userIsAuthorized(tags.username) && REGEX.SET_VOTING_PERIOD.test(message)) {
 		let voting_period;
 		if ((voting_period = parseInt(message.split(' ')[1])) && voting_period > 3 && voting_period < 1200) {
 			OPTS.VOTING_PERIOD = voting_period;
 			say(`Voting period is now ${OPTS.VOTING_PERIOD} seconds.`);
 		}
 	}
-	if (sloppyPGN !== false && /^([RNBKQK0-8a-h+#x=-]{2,7}|resign)$/i.test(message) && !voters.includes(tags.username) && tags.username !== OPTS.STREAMER.toLowerCase()) { // regex here is a *very* crude filter to only let messages that might be moves in
-		if (/^[Oo0]-[Oo0]$/.test(message)) message = 'O-O';
-		if (/^[Oo0]-[Oo0]-[Oo0]$/.test(message)) message = 'O-O-O';
 
-		let resign = message.toLowerCase().trim() === 'resign'; // added resign functionality in a pinch-might want to make code cleaner
+	channel = channel.substr(1);
+	let gameId = gameIdFromTwitch(channel);
+	let game = games[gameId];
+	if (game
+		&& isBotsTurn(game)
+		&& REGEX.POTENTIAL_MOVE.test(message)
+		&& ((!alreadyVoted(tags.username, game) && !isDrawOffer(message)) || (!alreadyOfferedDraw(tags.username, game) && isDrawOffer(message)))
+		/*&& tags.username !== OPTS.STREAMER.toLowerCase()*/) {
+		// message is likely a move
 
-		chess.load_pgn(sloppyPGN, { sloppy: true });
+		if 		(REGEX.KINGSIDE_CASTLE.test(message) ) message = 'O-O';
+		else if (REGEX.QUEENSIDE_CASTLE.test(message)) message = 'O-O-O';
 		
 		let move;
-		if (resign || (move = chess.move(message, { sloppy: true })) || (move = chess.move(message.charAt(0).toUpperCase() + message.slice(1), { sloppy: true }))) {
-			let UCI = resign ? 'resign' : move.from + move.to;
-			let SAN = resign ? 'resign' : move.san;
-			if (candidates[UCI])
-				candidates[UCI].votes++;
+		if (move = testMove(message, gameId)) {
+			let UCI = move.from + move.to, SAN = move.san;
+			if (game.candidates[UCI])
+				game.candidates[UCI].votes++;
 			else
-				candidates[UCI] = { votes: 1, SAN };
+				game.candidates[UCI] = { votes: 1, SAN };
 
-			voters.push(tags.username)
+			if (UCI === 'offer/accept draw') {
+				game.offeringDraw.push(tags.username);
+				var allUsers = [...new Set(game.voters.concat(game.offeringDraw))];
+				var pctDraw = Math.floor(game.offeringDraw.length / allUsers.length * 100);
+				game.candidates[UCI].pct = pctDraw;
+			} else {
+				game.voters.push(tags.username);
+			}
 
-			io.emit('candidates', candidates);
+			emitCandidates(game);
 
-			// if (OPTS.ACKNOWLEDGE_VOTE) client.say(channel, `@${tags['display-name']} voted for ${UCI}!`);
-			if (OPTS.ACKNOWLEDGE_VOTE) say(`@${tags['display-name']} voted for ${SAN}!`);
-			else console.log(`@${tags['display-name']} voted for ${SAN}!`);
-
-			// console.log(candidates);
+			// log the vote
+			if (OPTS.ACKNOWLEDGE_VOTE)
+				say(`@${tags['display-name']} voted ${UCI === 'offer/accept draw' ? 'to offer/accept a draw.' : `for ${SAN}!`}`);
+			else
+				console.log(`@${tags['display-name']} voted ${UCI === 'offer/accept draw' ? 'to offer/accept a draw.' : `for ${SAN}!`}`);
 		}
 	}
 });
@@ -121,9 +172,9 @@ function streamIncomingEvents() {
                 let data = chunk.toString();
                 try {
                 	let json = JSON.parse(data);
-                	if (json.type === 'challenge' && json.challenge.challenger.id === OPTS.STREAMER_LICHESS.toLowerCase()) {
+                	if (validChallenge(json))
                 		acceptChallenge(json.challenge.id);
-                	} else if (json.type === 'gameStart')
+                	else if (json.type === 'gameStart')
                 		beginGame(json.game.id);
                 } catch (e) { return; }
             });
@@ -147,35 +198,41 @@ async function streamGameState(gameId) {
                 let data = chunk.toString();
                 if (!data.trim()) return;
                 try {
-                	let json = JSON.parse(data);
+                	let lines = data.split('\n');
+                	for (line of lines) {
+	                	let json = JSON.parse(line);
 
-                	if (json.type === 'gameFull') {
-                		ongoingGames[gameId].white = json.white.title === 'BOT'; // assumes we're not playing against a bot account
-                		json = json.state;
-                	}
-                	if (json.type === 'gameState') {
-                		if (json.status === 'started') {
-	                		let numMoves = json.moves ? json.moves.split(' ').length : 0;
-	                		if (numMoves % 2 != ongoingGames[gameId].white) {
-	                			// bot's turn to move
-	                			if (numMoves >= 1) {
-	                				// nicer way to write this code? had to add it in a pinch
-	                				let sloppyPGN = json.moves.split(' ');
-	                				let streamerMove = sloppyPGN.pop();
-	                				chess.load_pgn(sloppyPGN.join(' '), { sloppy: true });
-									streamerMove = chess.move(streamerMove, { sloppy: true });
-	                				say(`Streamer played: ${streamerMove.san}`);
-	                			}
+	                	if (json.type === 'gameFull') {
+	                		// game started
+	                		games[gameId].white = json.white.id === OPTS.LICHESS_BOT.toLowerCase();
+	                		json = json.state;
+	                	}
+	                	if (json.type === 'gameState') {
+	                		if (json.status === 'started') {
+	                			// game in progress
+		                		let numMoves = json.moves ? json.moves.split(' ').length : 0;
+		                		if (numMoves % 2 != games[gameId].white) {
+		                			// bot's turn to move
+		                			if (numMoves >= 1) {
+		                				// nicer way to write this code? had to add it in a pinch
+		                				let sloppyPGN = json.moves.split(' ');
+		                				let streamerMove = sloppyPGN.pop();
+		                				chess.load_pgn(sloppyPGN.join(' '), { sloppy: true });
+										streamerMove = chess.move(streamerMove, { sloppy: true });
+		                				say(`Streamer played: ${streamerMove.san}`);
+		                			}
 
-	                			await initiateVote(gameId, json.moves);
+		                			await initiateVote(gameId, json.moves);
+		                		}
+	                		} else if (json.winner || json.status === 'draw') {
+	                			// game over
+	                			if (json.status === 'draw') resolve('draw');
+	                			if (json.winner === 'white' ^ games[gameId].white)
+	                				resolve('streamer');
+	                			else
+	                				resolve('chat');
 	                		}
-                		} else if (json.winner || json.status === 'draw') {
-                			if (json.status === 'draw') resolve('draw');
-                			if (json.winner === 'white' ^ ongoingGames[gameId].white)
-                				resolve('streamer');
-                			else
-                				resolve('chat');
-                		}
+	                	}// else if (json.type === 'chatLine' && json.room === 'player' && json.username === 'lichess') {}
                 	}
                 } catch (e) { console.log(`Data: ${data}`, `Error: ${e}`); }
             });
@@ -189,35 +246,43 @@ async function streamGameState(gameId) {
 function say(msg) {
 	console.log(...arguments);
 
-	if (OPTS.COOLDOWN_APPLIES)
+	if (OPTS.CHAT_COOLDOWN_APPLIES)
 		messageQueue.push(msg);
 	else
 		client.say(OPTS.STREAMER, msg);
 }
 
 async function initiateVote(gameId, moves, revote=0) {
-	if (!Object.keys(ongoingGames).includes(gameId)) return;
+	let game;
+	if (!(game = games[gameId])) return;
 	// say(revote ? `Nobody voted for a valid move! You have ${OPTS.VOTING_PERIOD} seconds to vote again. (${revote})` : `Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move (UCI format, ex: e2e4).`);
 	if (!revote) say(`Voting time! You have ${OPTS.VOTING_PERIOD} seconds to name a move.`);
-	sloppyPGN = moves;
+	game.sloppyPGN = moves;
 	setTimeout(async () => {
-		var arr = Object.keys(candidates).map(key => [key, candidates[key].votes, candidates[key].SAN]);
-		if (arr.length == 0) {
+		if (!(game = games[gameId])) return;
+
+		var arr = Object.keys(game.candidates).map(key => [key, game.candidates[key].votes, game.candidates[key].SAN]);
+		if (arr.length === 0 || (arr[0][0] === 'offer/accept draw' && arr.length === 1)) {
 			await initiateVote(gameId, moves, ++revote);
 			return;
 		}
+
 		var winningMove = arr.sort((a, b) => b[1] - a[1])[0];
+		if (winningMove[0] === 'offer/accept draw') winningMove = arr.sort((a, b) => b[1] - a[1])[1];
 
-		sloppyPGN = false;
-		voters = [];
-		candidates = {};
-		io.emit('candidates', candidates);
+		var allUsers = [...new Set(game.voters.concat(game.offeringDraw))];
+		var pctDraw = game.offeringDraw.length / allUsers.length;
 
-		if (!Object.keys(ongoingGames).includes(gameId)) return;
+		game.sloppyPGN = null;
+		game.voters = [];
+		game.offeringDraw = [];
+		game.candidates = {};
+		emitCandidates(game);
+
 		if (winningMove[0] === 'resign')
 			await resignGame(gameId);
 		else
-			await makeMove(gameId, winningMove[0] /* UCI */);
+			await makeMove(gameId, winningMove[0] /* UCI */, pctDraw >= 0.50);
 		say(`Playing move: ${winningMove[2] /* SAN */}`);
 	}, OPTS.VOTING_PERIOD * 1000);
 }
@@ -225,9 +290,9 @@ async function initiateVote(gameId, moves, revote=0) {
 async function beginGame(gameId) {
 	try {
 		say('Game started!', gameId);
-		ongoingGames[gameId] = { white: null };
+		games[gameId] = { white: null, sloppyPGN: null, candidates: {}, voters: [], offeringDraw: [], streamer: { twitch: OPTS.STREAMER.toLowerCase(), lichess: OPTS.STREAMER_LICHESS } };
 		var result = await streamGameState(gameId);
-		delete ongoingGames[gameId];
+		delete games[gameId];
 		switch (result) {
 			case 'draw':
 				say('Game over - It\'s a draw!', gameId);

@@ -16,14 +16,25 @@
 <body>
 <script src="/socket.io/socket.io.js"></script>
 <script>
+	const queryString = window.location.search;
+	const urlParams = new URLSearchParams(queryString);
+	const streamer = urlParams.get('streamer');
+
 	const socket = io();
+
+	if (streamer) {
+		setInterval(() => socket.emit('streamer', streamer), 2000); // interval so it can reconnect in case the bot goes down temporarily
+	} else {
+		document.body.innerHTML = 'You need to specify a streamer by appending \'?streamer=twitch username\' to the URL.';
+	}
+
 	socket.on('candidates', candidates => {
 		var sortedCandidates = Object.keys(candidates).map(key => [key, candidates[key]]).sort((a, b) => b[1].votes - a[1].votes);
 		document.body.innerHTML = '';
 		for (candidate of sortedCandidates) {
 			var { votes, SAN } = candidate[1];
 			var ul = document.createElement('ul');
-			var text = document.createTextNode(`${SAN} (${votes} vote${votes === 1 ? '' : 's'})`);
+			var text = document.createTextNode(`${SAN} (${SAN === 'offer/accept draw' ? `${candidate[1].pct}%` : `${votes} vote${votes === 1 ? '' : 's'}`})`);
 			ul.appendChild(text);
 			document.body.appendChild(ul);
 		}
