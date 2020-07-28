@@ -51,7 +51,7 @@ const https = require('https');
 const tmi = require('tmi.js');
 
 const client = new tmi.Client({
-	options: { debug: true }, // set to false to get rid of console messages
+	options: { debug: false }, // set to false to get rid of console messages
 	connection: {
 		secure: true,
 		reconnect: true
@@ -70,7 +70,6 @@ client.connect();
 client.on('join', () => {
 	let userstate = client.userstate[`#${OPTS.STREAMER.toLowerCase()}`];
 	OPTS.CHAT_COOLDOWN_APPLIES = !isModOrVIP(userstate);
-	console.log(`Chat cooldown applies:`, OPTS.CHAT_COOLDOWN_APPLIES);
 
 	if (OPTS.CHAT_COOLDOWN_APPLIES && !cooldownInterval)
 		cooldownInterval = setInterval(shiftChatQueue, OPTS.CHAT_COOLDOWN);
@@ -125,7 +124,7 @@ client.on('message', (channel, tags, message, self) => {
 		&& isBotsTurn(game)
 		&& REGEX.POTENTIAL_MOVE.test(message)
 		&& ((!alreadyVoted(tags.username, game) && !isDrawOffer(message)) || (!alreadyOfferedDraw(tags.username, game) && isDrawOffer(message)))
-		/*&& tags.username !== OPTS.STREAMER.toLowerCase()*/) {
+		&& tags.username !== OPTS.STREAMER.toLowerCase()) {
 		// message is likely a move
 
 		if 		(REGEX.KINGSIDE_CASTLE.test(message) ) message = 'O-O';
@@ -200,6 +199,7 @@ async function streamGameState(gameId) {
                 try {
                 	let lines = data.split('\n');
                 	for (line of lines) {
+                		if (!line) return;
 	                	let json = JSON.parse(line);
 
 	                	if (json.type === 'gameFull') {
