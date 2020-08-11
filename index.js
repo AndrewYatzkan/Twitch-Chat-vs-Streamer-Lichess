@@ -9,7 +9,7 @@ var messageQueue = [];
 
 const REGEX = {
 	SET_VOTING_PERIOD: /^!setvotingperiod \d+$/i,
-	POTENTIAL_MOVE: /^([RNBKQK0-8a-h+#x=-]{2,7}|resign|offer draw|accept draw)$/i, // very crude guesstimate
+	POTENTIAL_MOVE: /^([RNBKQK0-8a-h+#x=-]{2,7}|resign|offer draw|accept draw|offer/accept draw)$/i, // very crude guesstimate
 	KINGSIDE_CASTLE: /^[Oo0]-[Oo0]$/,
 	QUEENSIDE_CASTLE: /^[Oo0]-[Oo0]-[Oo0]$/
 };
@@ -57,7 +57,7 @@ const client = new tmi.Client({
 		reconnect: true
 	},
 	identity: {
-		username: 'TTVChat',
+		username: 'TTVChat', // just realized--this is wrong.. why does it still work?
 		password: OPTS.TWITCH_OAUTH
 	},
 	channels: [ OPTS.STREAMER ]
@@ -81,7 +81,7 @@ function userIsAuthorized(username) { return OPTS.AUTHORIZED_USERS.includes(user
 function isBotsTurn(game) { return !(game.sloppyPGN === null); }
 function alreadyVoted(username, game) { return game.voters.includes(username); }
 function alreadyOfferedDraw(username, game) { return game.offeringDraw.includes(username); }
-function isDrawOffer(message) { return message.toLowerCase().trim === 'offer draw' || message.toLowerCase().trim() === 'accept draw'; }
+function isDrawOffer(message) { return message.toLowerCase().trim() === 'offer draw' || message.toLowerCase().trim() === 'accept draw' || message.toLowerCase().trim() === 'offer/accept draw'; }
 function testMove(possibleMove, gameId) {
 	chess.load_pgn(games[gameId].sloppyPGN, { sloppy: true });
 	let result;
