@@ -9,7 +9,7 @@ var messageQueue = [];
 
 const REGEX = {
 	SET_VOTING_PERIOD: /^!setvotingperiod \d+$/i,
-	POTENTIAL_MOVE: /^([RNBKQK0-8a-h+#x=-]{2,7}|resign|offer draw|accept draw|offer/accept draw)$/i, // very crude guesstimate
+	POTENTIAL_MOVE: /^([RNBKQK0-8a-h+#x=-]{2,7}|resign|offer draw|accept draw|offer\/accept draw)$/i, // very crude guesstimate
 	KINGSIDE_CASTLE: /^[Oo0]-[Oo0]$/,
 	QUEENSIDE_CASTLE: /^[Oo0]-[Oo0]-[Oo0]$/
 };
