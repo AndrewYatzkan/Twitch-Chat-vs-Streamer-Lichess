@@ -40,3 +40,4 @@ module.exports = {
  - [ ] multiple streamers at once! shouldn't be too hard with current setup
  	- Update: won't work unless lichess authorizes the host ip to bypass their rate limiting
  - [ ] support for other variants & from position
+ - [ ] blacklist moves
