@@ -29,6 +29,7 @@ module.exports = {
 6) Challenge the lichess bot-it will automatically accept challenges from the `STREAMER_LICHESS` account and instructions will be sent to chat!
 
 ## Bugs:
+ - offer draw not registering?
  - if the bot is restarted on its turn, it doesn't reconnect
  	- would need to save ongoing games dictionary before it exists
  - tmi.js 'join' event is called late sometimes -> message queue doesn't work at first
