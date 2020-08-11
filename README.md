@@ -41,3 +41,4 @@ module.exports = {
  	- Update: won't work unless lichess authorizes the host ip to bypass their rate limiting
  - [ ] support for other variants & from position
  - [ ] blacklist moves
+ - [ ] auto-reconnect when lichess is down & bot crashes
