@@ -42,3 +42,4 @@ module.exports = {
  - [ ] support for other variants & from position
  - [ ] blacklist moves
  - [ ] auto-reconnect when lichess is down & bot crashes
+ - [ ] automatically set voting period to increment? (disallows +0 games, but do we care?)
