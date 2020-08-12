@@ -15,7 +15,6 @@ const REGEX = {
 };
 
 const { Chess } = require('chess.js');
-const chess = new Chess();
 var games = {};
 var cooldownInterval;
 
@@ -83,7 +82,10 @@ function alreadyVoted(username, game) { return game.voters.includes(username); }
 function alreadyOfferedDraw(username, game) { return game.offeringDraw.includes(username); }
 function isDrawOffer(message) { return message.toLowerCase().trim() === 'offer draw' || message.toLowerCase().trim() === 'accept draw' || message.toLowerCase().trim() === 'offer/accept draw'; }
 function testMove(possibleMove, gameId) {
-	chess.load_pgn(games[gameId].sloppyPGN, { sloppy: true });
+	let chess = games[gameId].initialFen ? new Chess(games[gameId].initialFen) : new Chess();
+	for (move of games[gameId].sloppyPGN.split(' ')) {
+		chess.move(move, { sloppy: true });
+	}
 	let result;
 	if (possibleMove.toLowerCase().trim() === 'resign')
 		return { from: 'resign', to: '', san: 'resign'}
@@ -124,7 +126,7 @@ client.on('message', (channel, tags, message, self) => {
 		&& isBotsTurn(game)
 		&& REGEX.POTENTIAL_MOVE.test(message)
 		&& ((!alreadyVoted(tags.username, game) && !isDrawOffer(message)) || (!alreadyOfferedDraw(tags.username, game) && isDrawOffer(message)))
-		&& tags.username !== OPTS.STREAMER.toLowerCase()) {
+		/*&& tags.username !== OPTS.STREAMER.toLowerCase()*/) {
 		// message is likely a move
 
 		if 		(REGEX.KINGSIDE_CASTLE.test(message) ) message = 'O-O';
@@ -171,10 +173,11 @@ function streamIncomingEvents() {
                 let data = chunk.toString();
                 try {
                 	let json = JSON.parse(data);
-                	if (validChallenge(json))
+                	if (validChallenge(json)) {
                 		acceptChallenge(json.challenge.id);
-                	else if (json.type === 'gameStart')
+                	} else if (json.type === 'gameStart') {
                 		beginGame(json.game.id);
+                	}
                 } catch (e) { return; }
             });
             res.on('end', () => {
@@ -204,6 +207,8 @@ async function streamGameState(gameId) {
 
 	                	if (json.type === 'gameFull') {
 	                		// game started
+	                		let initialFen = json.initialFen;
+	                		games[gameId].initialFen = initialFen === 'startpos' ? null : initialFen;
 	                		games[gameId].white = json.white.id === OPTS.LICHESS_BOT.toLowerCase();
 	                		json = json.state;
 	                	}
@@ -215,9 +220,12 @@ async function streamGameState(gameId) {
 		                			// bot's turn to move
 		                			if (numMoves >= 1) {
 		                				// nicer way to write this code? had to add it in a pinch
-		                				let sloppyPGN = json.moves.split(' ');
-		                				let streamerMove = sloppyPGN.pop();
-		                				chess.load_pgn(sloppyPGN.join(' '), { sloppy: true });
+		                				let moves = json.moves.split(' ');
+		                				let streamerMove = moves.pop();
+		                				let chess = games[gameId].initialFen ? new Chess(games[gameId].initialFen) : new Chess();
+		                				for (move of moves) {
+		                					chess.move(move, { sloppy: true });
+		                				}
 										streamerMove = chess.move(streamerMove, { sloppy: true });
 		                				say(`Streamer played: ${streamerMove.san}`);
 		                			}
