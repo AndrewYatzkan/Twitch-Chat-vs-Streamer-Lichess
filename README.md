@@ -42,3 +42,5 @@ module.exports = {
  - [x] support for different initial starting positions
  - [ ] support for variants with different rules (anti-chess, atomic, etc.)
  - [ ] blacklist moves
+ - [ ] auto-reconnect when lichess is down & bot crashes
+ - [ ] automatically set voting period to increment? (disallows +0 games, but do we care?)
