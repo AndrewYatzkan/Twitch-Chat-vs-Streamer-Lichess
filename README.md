@@ -44,3 +44,4 @@ module.exports = {
  - [ ] blacklist moves
  - [ ] auto-reconnect when lichess is down & bot crashes
  - [ ] automatically set voting period to increment? (disallows +0 games, but do we care?)
+ - [ ] Bug: offer/accept draw & resign % doesn't update on each vote, only updates when people vote for it
